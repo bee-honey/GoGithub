@@ -4,27 +4,51 @@ async function fetchCommits() {
         const response = await fetch('/api/commits');
         const commits = await response.json();
 
+        console.log(commits);
+
         const commitList = document.getElementById('commit-list');
-        commitList.innerHTML = '';
-        commits.forEach(commit => {
+        commitList.innerHTML = ''; // Clear previous commits
+
+        commits.forEach((commit, index) => {
             const commitItem = document.createElement('div');
             commitItem.classList.add('commit');
 
+            // Determine the color based on the conclusion
+    let conclusionColor;
+    switch (commit.conclusion.toLowerCase()) {
+        case 'success':
+            conclusionColor = 'green';
+            break;
+        case 'failure':
+            conclusionColor = 'red';
+            break;
+        default:
+            conclusionColor = 'grey';  // For cases where there is no conclusion or 'nothing'
+            break;
+    }
+
+            // Add commit details
             commitItem.innerHTML = `
                 <h3>Commit: ${commit.sha}</h3>
-                <p>Message: ${commit.commit.message}</p>
-                <p>Author: ${commit.commit.author.name} (${commit.commit.author.email})</p>
+                <p>Message: ${commit.message}</p>
+                <p>Author: ${commit.author}</p>
+                <p>Status: ${commit.status} (<span style="color: ${conclusionColor};">${commit.conclusion}</span>)</p>
+                
             `;
 
-            //Release button
+            // Create the Release button
             const releaseButton = document.createElement('button');
             releaseButton.textContent = 'Release';
             releaseButton.id = `release-btn-${index}`;
             releaseButton.addEventListener('click', () => {
                 alert(`Releasing commit: ${commit.sha}`);
-                // Need to add more logic here to handle the release process
+                // You can add more logic here to handle the release process
             });
+
+            // Append the button to the commit item
             commitItem.appendChild(releaseButton);
+
+            // Append the commit item to the commit list
             commitList.appendChild(commitItem);
         });
     } catch (error) {
