@@ -40,9 +40,21 @@ async function fetchCommits() {
             const releaseButton = document.createElement('button');
             releaseButton.textContent = 'Release';
             releaseButton.id = `release-btn-${index}`;
-            releaseButton.addEventListener('click', () => {
-                alert(`Releasing commit: ${commit.sha}`);
-                // You can add more logic here to handle the release process
+            releaseButton.disabled = commit.conclusion.toLowerCase() !== 'success';
+            releaseButton.addEventListener('click', async () => {
+                
+                try {
+                    const response = await fetch('/api/release', {
+                        method: 'POST',
+                    });
+                    if (response.ok) {
+                        alert(`CI-INFO: Workflow triggered successfully for commit: ${commit.sha}`);
+                    } else {
+                        alert(`CI-ERROR: Failed to trigger workflow for commit: ${commit.sha}`);
+                    }
+                } catch (error) {
+                    console.error('CI-ERROR: Error triggering the release', error)
+                }
             });
 
             // Append the button to the commit item

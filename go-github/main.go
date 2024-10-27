@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"go-github/entities"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -83,9 +85,60 @@ func fetchWorkflowRuns(repoOwner, repoName string) (map[string]entities.Workflow
 	return workflowMap, nil
 }
 
+func triggerRelease(w http.ResponseWriter, r *http.Request) {
+
+	fmt.Println("Triggered release")
+	repoOwner := "bee-honey"
+	repoName := "CICDAbt"
+	workflowFile := "release.yml"
+
+	githubToken := os.Getenv("GITHUB_TOKEN") //@myself, make sure this is safe if deployed to AWS
+
+	if githubToken == "" {
+		http.Error(w, "GITHUB_TOKEN not set", http.StatusInternalServerError)
+		return
+	}
+
+	// API to trigger the workflow
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/actions/workflows/%s/dispatches", repoOwner, repoName, workflowFile)
+	payload := map[string]string{
+		"ref": "main", //For now lets only worry about the main, hotfixes etc to be delt later on
+	}
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		http.Error(w, "Failed to encode JSON payload", http.StatusInternalServerError)
+		return
+	}
+
+	// trigger the workflow
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		http.Error(w, "Failed to create request", http.StatusInternalServerError)
+		return
+	}
+	req.Header.Set("Authorization", "Bearer "+githubToken)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		http.Error(w, "Failed to execute request", http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		log.Printf("GitHub API returned status %d", resp.StatusCode)
+		http.Error(w, "GitHub API request failed", http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Fprintln(w, "Workflow triggered successfully!")
+}
+
 func commitsHandler(w http.ResponseWriter, r *http.Request) {
 	repoOwner := "bee-honey"
-	repoName := "AbbtKeerthy"
+	repoName := "CICDAbt"
 
 	//Commits info
 	commits, err := fetchCommits(repoOwner, repoName)
@@ -120,6 +173,7 @@ func commitsHandler(w http.ResponseWriter, r *http.Request) {
 // Serve static files and run the server
 func main() {
 	http.HandleFunc("/api/commits", commitsHandler)
+	http.HandleFunc("/api/release", triggerRelease)
 
 	fs := http.FileServer(http.Dir("./static"))
 	http.Handle("/", fs)
