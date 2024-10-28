@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"go-github/entities"
+	"go-github/utils"
 	"log"
 	"net/http"
 	"os"
@@ -47,10 +48,12 @@ func fetchCommits(repoOwner, repoName string) ([]entities.CICommit, error) {
 
 	var commits []entities.CICommit
 	for _, c := range apiCommits {
+		readableDate := utils.FormatToReadableDate(c.Commit.Author.Date)
 		commit := entities.CICommit{
 			Sha:     c.Sha,
 			Message: c.Commit.Message,
 			Author:  c.Commit.Author.Name,
+			Date:    readableDate,
 		}
 		commits = append(commits, commit)
 	}

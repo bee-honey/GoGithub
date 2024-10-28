@@ -14,23 +14,24 @@ async function fetchCommits() {
             commitItem.classList.add('commit');
 
             // Determine the color based on the conclusion
-    let conclusionColor;
-    switch (commit.conclusion.toLowerCase()) {
-        case 'success':
-            conclusionColor = 'green';
-            break;
-        case 'failure':
-            conclusionColor = 'red';
-            break;
-        default:
-            conclusionColor = 'grey';  // For cases where there is no conclusion or 'nothing'
-            break;
-    }
+            let conclusionColor;
+            switch (commit.conclusion.toLowerCase()) {
+                case 'success':
+                    conclusionColor = 'green';
+                break;
+                case 'failure':
+                    conclusionColor = 'red';
+                break;
+                default:
+                    conclusionColor = 'grey';  // For cases where there is no conclusion or 'nothing'
+                break;
+            }
 
             // Add commit details
             commitItem.innerHTML = `
-                <h3>Commit: ${commit.sha}</h3>
+                <h3>Commit: ${commit.sha.slice(0, 7)}</h3>
                 <p>Message: ${commit.message}</p>
+                <p>Date: ${commit.date}</p>
                 <p>Author: ${commit.author}</p>
                 <p>Status: ${commit.status} (<span style="color: ${conclusionColor};">${commit.conclusion}</span>)</p>
                 
@@ -57,10 +58,8 @@ async function fetchCommits() {
                 }
             });
 
-            // Append the button to the commit item
+            // Append the button and commit to the commit list
             commitItem.appendChild(releaseButton);
-
-            // Append the commit item to the commit list
             commitList.appendChild(commitItem);
         });
     } catch (error) {

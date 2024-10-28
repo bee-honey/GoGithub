@@ -5,6 +5,7 @@ type CICommit struct {
 	Sha        string `json:"sha"`
 	Message    string `json:"message"`
 	Author     string `json:"author"`
+	Date       string `json:"date"`
 	Status     string `json:"status"` // Includes the status of the associated workflow run
 	Conclusion string `json:"conclusion"`
 }
