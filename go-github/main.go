@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"go-github/entities"
@@ -24,62 +23,10 @@ func getAPIBaseURL(repoOwner, repoName, endpoint string) string {
 	return fmt.Sprintf("%s/%s", baseURL, endpoint)
 }
 
-// Fetch commits from the GitHub API
-func fetchCommits_bk(repoOwner, repoName string) ([]entities.CICommit, error) {
-	// GitHub API URL
-	// TBD: Need to be able to change the reponame with a dropdown
-	url := getAPIBaseURL(repoOwner, repoName, "commits")
-
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("error fetching commits: %s", resp.Status)
-	}
-
-	var apiCommits []entities.GitCommit
-
-	if err := json.NewDecoder(resp.Body).Decode(&apiCommits); err != nil {
-		return nil, err
-	}
-
-	var commits []entities.CICommit
-	for _, c := range apiCommits {
-		readableDate := utils.FormatToReadableDate(c.Commit.Author.Date)
-		commit := entities.CICommit{
-			Sha:     c.Sha,
-			Message: c.Commit.Message,
-			Author:  c.Commit.Author.Name,
-			Date:    readableDate,
-		}
-		commits = append(commits, commit)
-	}
-
-	return commits, nil
-}
-
 func fetchCommits(repoOwner, repoName string) ([]entities.CICommit, error) {
 	url := getAPIBaseURL(repoOwner, repoName, "commits")
 
-	// Retrieve the GitHub token from environment variables
-	githubToken := os.Getenv("GITHUB_TOKEN")
-	if githubToken == "" {
-		return nil, fmt.Errorf("GitHub token is not set in environment variables")
-	}
-
-	// Create the HTTP request with Authorization header
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+githubToken)
-
-	// Send the HTTP request
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := utils.GetRequest(url)
 	if err != nil {
 		return nil, err
 	}
@@ -110,55 +57,10 @@ func fetchCommits(repoOwner, repoName string) ([]entities.CICommit, error) {
 }
 
 // Fetch workflow runs from GitHub Actions API
-func fetchWorkflowRuns_bk(repoOwner, repoName string) (map[string]entities.WorkflowRun, error) {
-
-	url := getAPIBaseURL(repoOwner, repoName, "actions/runs")
-
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("error fetching workflow runs: %s", resp.Status)
-	}
-
-	var result struct {
-		WorkflowRuns []entities.WorkflowRun `json:"workflow_runs"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
-	}
-
-	// Create a map of commit SHA to workflow run for quick lookup
-	workflowMap := make(map[string]entities.WorkflowRun)
-	for _, run := range result.WorkflowRuns {
-		workflowMap[run.HeadSha] = run
-	}
-
-	return workflowMap, nil
-}
-
 func fetchWorkflowRuns(repoOwner, repoName string) (map[string]entities.WorkflowRun, error) {
 	url := getAPIBaseURL(repoOwner, repoName, "actions/runs")
 
-	// Retrieve GitHub token from environment variables
-	githubToken := os.Getenv("GITHUB_TOKEN")
-	if githubToken == "" {
-		return nil, fmt.Errorf("GitHub token is not set in environment variables")
-	}
-
-	// Create the HTTP request with Authorization header
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+githubToken)
-
-	// Send the HTTP request
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := utils.GetRequest(url)
 	if err != nil {
 		return nil, err
 	}
@@ -198,31 +100,15 @@ func triggerRelease(w http.ResponseWriter, r *http.Request) {
 	payload := map[string]string{
 		"ref": "main", //For now lets only worry about the main, hotfixes etc to be delt later on
 	}
-	jsonPayload, err := json.Marshal(payload)
-	if err != nil {
-		http.Error(w, "Failed to encode JSON payload", http.StatusInternalServerError)
-		return
-	}
 
-	// trigger the workflow
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonPayload))
+	resp, err := utils.PostRequest(url, payload)
 	if err != nil {
-		http.Error(w, "Failed to create request", http.StatusInternalServerError)
-		return
-	}
-	req.Header.Set("Authorization", "Bearer "+githubToken)
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		http.Error(w, "Failed to execute request", http.StatusInternalServerError)
+		http.Error(w, "Failed to execute request"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusNoContent {
-		log.Printf("GitHub API returned status %d", resp.StatusCode)
 		http.Error(w, "GitHub API request failed", http.StatusInternalServerError)
 		return
 	}
