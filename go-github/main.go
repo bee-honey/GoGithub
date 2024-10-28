@@ -11,11 +11,23 @@ import (
 	"strings"
 )
 
+var (
+	repoOwner    = "bee-honey"
+	repoName     = "CICDAbt"
+	workflowFile = "release.yml"
+)
+
+func getAPIBaseURL(repoOwner, repoName, endpoint string) string {
+	const apiBaseURLPattern = "https://api.github.com/repos/%s/%s"
+	baseURL := fmt.Sprintf(apiBaseURLPattern, repoOwner, repoName)
+	return fmt.Sprintf("%s/%s", baseURL, endpoint)
+}
+
 // Fetch commits from the GitHub API
 func fetchCommits(repoOwner, repoName string) ([]entities.CICommit, error) {
 	// GitHub API URL
 	// TBD: Need to be able to change the reponame with a dropdown
-	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/commits", repoOwner, repoName)
+	url := getAPIBaseURL(repoOwner, repoName, "commits")
 
 	resp, err := http.Get(url)
 	if err != nil {
@@ -27,15 +39,7 @@ func fetchCommits(repoOwner, repoName string) ([]entities.CICommit, error) {
 		return nil, fmt.Errorf("error fetching commits: %s", resp.Status)
 	}
 
-	var apiCommits []struct {
-		Sha    string `json:"sha"`
-		Commit struct {
-			Message string `json:"message"`
-			Author  struct {
-				Name string `json:"name"`
-			} `json:"author"`
-		} `json:"commit"`
-	}
+	var apiCommits []entities.GitCommit
 
 	if err := json.NewDecoder(resp.Body).Decode(&apiCommits); err != nil {
 		return nil, err
@@ -48,7 +52,6 @@ func fetchCommits(repoOwner, repoName string) ([]entities.CICommit, error) {
 			Message: c.Commit.Message,
 			Author:  c.Commit.Author.Name,
 		}
-
 		commits = append(commits, commit)
 	}
 
@@ -57,7 +60,8 @@ func fetchCommits(repoOwner, repoName string) ([]entities.CICommit, error) {
 
 // Fetch workflow runs from GitHub Actions API
 func fetchWorkflowRuns(repoOwner, repoName string) (map[string]entities.WorkflowRun, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/actions/runs", repoOwner, repoName)
+
+	url := getAPIBaseURL(repoOwner, repoName, "actions/runs")
 
 	resp, err := http.Get(url)
 	if err != nil {
@@ -86,11 +90,6 @@ func fetchWorkflowRuns(repoOwner, repoName string) (map[string]entities.Workflow
 }
 
 func triggerRelease(w http.ResponseWriter, r *http.Request) {
-
-	fmt.Println("Triggered release")
-	repoOwner := "bee-honey"
-	repoName := "CICDAbt"
-	workflowFile := "release.yml"
 
 	githubToken := os.Getenv("GITHUB_TOKEN") //@myself, make sure this is safe if deployed to AWS
 
@@ -137,8 +136,6 @@ func triggerRelease(w http.ResponseWriter, r *http.Request) {
 }
 
 func commitsHandler(w http.ResponseWriter, r *http.Request) {
-	repoOwner := "bee-honey"
-	repoName := "CICDAbt"
 
 	//Commits info
 	commits, err := fetchCommits(repoOwner, repoName)
@@ -178,11 +175,7 @@ func main() {
 	fs := http.FileServer(http.Dir("./static"))
 	http.Handle("/", fs)
 
-	// port := os.Getenv("PORT")
 	var port = "8085"
-	// if port == "" {
-	// 	port = "8085"
-	// }
 
 	fmt.Println("Server started at port:", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
